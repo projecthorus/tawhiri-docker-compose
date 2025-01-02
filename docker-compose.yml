@@ -7,7 +7,7 @@ services:
   downloader:
     image: ghcr.io/projecthorus/tawhiri-downloader-container:latest
     volumes:
-      - model:/srv/tawhiri-datasets:
+      - model:/srv/tawhiri-datasets
     environment:
       - PYTHONUNBUFFERED=1 # used to allow python logs to output better
       - TZ=UTC
