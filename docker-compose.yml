@@ -1,0 +1,56 @@
+volumes:
+  model:
+  ruaumoko:
+services:
+
+  # COMMENT OUT THIS SERVICE TO PREVENT REDOWNLOADING
+  downloader:
+    image: ghcr.io/projecthorus/tawhiri-downloader-container:latest
+    volumes:
+      - model:/srv/tawhiri-datasets:
+    environment:
+      - PYTHONUNBUFFERED=1 # used to allow python logs to output better
+      - TZ=UTC
+
+  # COMMENT OUT THIS SERVICE TO PREVENT REDOWNLOADING
+  ruaumoko:
+    image: ghcr.io/projecthorus/tawhiri:master
+    volumes:
+      - ruaumoko:/srv
+      - model:/srv/tawhiri-datasets
+    entrypoint: /root/.local/bin/ruaumoko-download
+    command: [ "-v" ]
+    platform: "linux/amd64"
+  
+
+  updater:
+    #IF ruaumoko and downloader COMMENTED OUT THEN COMMENT OUT THIS depends_on SECTION
+    depends_on: # ensure the downloader has run first
+      downloader:
+        condition: service_completed_successfully
+    image: ghcr.io/projecthorus/tawhiri-downloader-container:latest
+    volumes:
+      - model:/srv/tawhiri-datasets
+    environment:
+      - PYTHONUNBUFFERED=1 # used to allow python logs to output better
+      - TZ=UTC
+    entrypoint: /root/tawhiri-downloader/default/main.exe
+    command: ["daemon", "-base-url", "aws-mirror"] 
+
+  tawhiri:
+    #IF ruaumoko and downloader COMMENTED OUT THEN COMMENT OUT THIS depends_on SECTION
+    depends_on: # ensure the downloader has run first
+      downloader:
+        condition: service_completed_successfully
+      ruaumoko:
+        condition: service_completed_successfully
+    image: ghcr.io/projecthorus/tawhiri:master
+    volumes:
+      - ruaumoko:/srv
+      - model:/srv/tawhiri-datasets
+    # tweak workers / threads for performance based on cpu cores
+    command: [ "/root/.local/bin/gunicorn", "-b", "0.0.0.0:8000", "--workers=1", "--timeout=3", "--keep-alive=65", "--threads=20", "tawhiri.api:app" ]
+    ports:
+      - 8000:8000
+    platform: "linux/amd64"
+  
